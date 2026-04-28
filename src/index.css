@@ -1,0 +1,14 @@
+/* Global styles — bundled by Vite. Tailwind utilities load from CDN in index.html. */
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
