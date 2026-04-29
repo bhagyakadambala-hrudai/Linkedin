@@ -360,9 +360,20 @@ export const Onboarding: React.FC = () => {
         window.history.replaceState({}, '', window.location.pathname + cleanHash);
       }
 
-      if (urlParams.get('error')) {
-        const errorMsg = urlParams.get('msg') || 'Failed to connect LinkedIn';
-        setError(decodeURIComponent(errorMsg));
+      if (urlParams.get('error') || urlParams.get('linkedin_error')) {
+        const errorCode = urlParams.get('linkedin_error') || urlParams.get('error') || 'unknown';
+        const detail = urlParams.get('msg') || '';
+        const readableErrors: Record<string, string> = {
+          config_error: 'Server configuration error — contact support.',
+          token_failed: 'LinkedIn rejected the connection. Check your LinkedIn app credentials.',
+          user_not_found: 'Account not found. Please sign in and try again.',
+          db_error: 'Failed to save LinkedIn connection.',
+          linkedin_denied: 'LinkedIn access was denied.',
+          no_code: 'LinkedIn did not return an auth code.',
+          server_error: 'Unexpected server error.',
+        };
+        const errorMsg = readableErrors[errorCode] || detail || 'Failed to connect LinkedIn';
+        setError(errorMsg + (detail && !readableErrors[errorCode] ? '' : detail ? ` (${detail})` : ''));
         setTimeout(() => {
           const cleanHash = hash.split('?')[0];
           window.history.replaceState({}, '', window.location.pathname + cleanHash);

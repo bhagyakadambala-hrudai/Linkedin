@@ -3,7 +3,6 @@ const { createClient } = require("@supabase/supabase-js");
 const REDIRECT_URI = "https://linkedin-theta-seven.vercel.app/api/linkedin/callback";
 const FRONTEND_BASE = "https://linkedin-theta-seven.vercel.app";
 
-// Whitelist of allowed origins — prevents open redirect attacks
 const ALLOWED_ORIGINS = [
   "https://linkedin-theta-seven.vercel.app",
   "https://linkedin-saas-git-dev-hrudai.vercel.app",
@@ -17,21 +16,28 @@ function redirect(res, status, url) {
 }
 
 async function handler(req, res) {
-  // Default fallbacks — overridden once we parse state
   let appOrigin = FRONTEND_BASE;
   let returnPath = "/app/profile-setup";
 
   const makeSuccessUrl = () => `${appOrigin}/#${returnPath}?linkedin=connected`;
-  const makeErrorUrl   = (code = "linkedin_failed") => `${appOrigin}/#/auth?error=${code}`;
+  const makeErrorUrl = (code = "linkedin_failed", detail = "") =>
+    `${appOrigin}/#/app/profile-setup?linkedin_error=${encodeURIComponent(code)}${detail ? `&msg=${encodeURIComponent(detail)}` : ""}`;
 
   try {
     if (req.method !== "GET") {
-      redirect(res, 302, makeErrorUrl());
+      redirect(res, 302, makeErrorUrl("method_not_allowed"));
       return;
     }
 
     const code = req.query.code;
     const state = req.query.state;
+
+    // LinkedIn denied access or returned an error
+    if (req.query.error) {
+      console.error("[LinkedIn callback] LinkedIn error:", req.query.error, req.query.error_description);
+      redirect(res, 302, makeErrorUrl("linkedin_denied", req.query.error_description || req.query.error));
+      return;
+    }
 
     if (!code) {
       redirect(res, 302, makeErrorUrl("no_code"));
@@ -40,18 +46,17 @@ async function handler(req, res) {
 
     if (!state) {
       console.error("[LinkedIn callback] No state found");
-      redirect(res, 302, makeErrorUrl());
+      redirect(res, 302, makeErrorUrl("no_state"));
       return;
     }
 
-    let userEmail;
-    let userId;
+    let userEmail = null;
+    let userId = null;
     try {
       const decoded = JSON.parse(Buffer.from(state, "base64").toString("utf8"));
-      userEmail = decoded && decoded.email;
-      userId = decoded && decoded.userId;
+      userEmail = (decoded && decoded.email) || null;
+      userId = (decoded && decoded.userId) || null;
 
-      // Resolve origin — validate against whitelist to prevent open redirect
       if (decoded.appOrigin && ALLOWED_ORIGINS.includes(decoded.appOrigin)) {
         appOrigin = decoded.appOrigin;
       }
@@ -60,27 +65,35 @@ async function handler(req, res) {
       }
     } catch (e) {
       console.error("[LinkedIn callback] Invalid state:", e.message);
-      redirect(res, 302, makeErrorUrl());
+      redirect(res, 302, makeErrorUrl("bad_state"));
       return;
     }
 
-    if (!userEmail || typeof userEmail !== "string" || !userEmail.trim()) {
-      console.error("[LinkedIn callback] No email in state");
-      redirect(res, 302, makeErrorUrl());
+    // Need at least one identifier to save the token
+    if (!userId && !userEmail) {
+      console.error("[LinkedIn callback] No userId or email in state");
+      redirect(res, 302, makeErrorUrl("no_identity"));
       return;
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL && String(process.env.SUPABASE_URL).trim();
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY && String(process.env.SUPABASE_SERVICE_ROLE_KEY).trim();
-    const clientId = process.env.LINKEDIN_CLIENT_ID && String(process.env.LINKEDIN_CLIENT_ID).trim();
-    const clientSecret = process.env.LINKEDIN_CLIENT_SECRET && String(process.env.LINKEDIN_CLIENT_SECRET).trim();
+    const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/$/, "");
+    const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+    const clientId = (process.env.LINKEDIN_CLIENT_ID || "").trim();
+    const clientSecret = (process.env.LINKEDIN_CLIENT_SECRET || "").trim();
 
-    if (!supabaseUrl || !serviceKey || !clientId || !clientSecret) {
-      console.error("[LinkedIn callback] Missing env");
-      redirect(res, 302, makeErrorUrl());
+    const missing = [];
+    if (!supabaseUrl) missing.push("SUPABASE_URL");
+    if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+    if (!clientId) missing.push("LINKEDIN_CLIENT_ID");
+    if (!clientSecret) missing.push("LINKEDIN_CLIENT_SECRET");
+
+    if (missing.length > 0) {
+      console.error("[LinkedIn callback] Missing env vars:", missing.join(", "));
+      redirect(res, 302, makeErrorUrl("config_error", `Missing: ${missing.join(", ")}`));
       return;
     }
 
+    // Exchange code for LinkedIn access token
     const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -97,23 +110,20 @@ async function handler(req, res) {
     const accessToken = tokenData && tokenData.access_token;
 
     if (!accessToken || typeof accessToken !== "string") {
-      console.error("[LinkedIn callback] No access_token in response", tokenData);
-      redirect(res, 302, makeErrorUrl());
+      const errDetail = tokenData.error_description || tokenData.error || `HTTP ${tokenRes.status}`;
+      console.error("[LinkedIn callback] No access_token:", errDetail, tokenData);
+      redirect(res, 302, makeErrorUrl("token_failed", errDetail));
       return;
     }
-
-    console.log("Saving token for:", userEmail, "userId:", userId || "unknown");
-    console.log("Token:", accessToken ? "[REDACTED]" : "missing");
 
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Resolve userId from state, or fall back to looking up by email in auth.users
+    // Resolve userId — use from state directly, or fall back to email lookup in profiles
     let resolvedUserId = typeof userId === "string" && userId.trim() ? userId.trim() : null;
 
-    if (!resolvedUserId) {
-      // Fallback: look up user_id from profiles table by email
+    if (!resolvedUserId && userEmail) {
       const { data: profileRow } = await supabase
         .from("profiles")
         .select("user_id")
@@ -122,38 +132,42 @@ async function handler(req, res) {
       resolvedUserId = profileRow?.user_id ?? null;
     }
 
-    let saveError = null;
-
-    if (resolvedUserId) {
-      // Preferred path: upsert by user_id (guaranteed to work)
-      const { error } = await supabase
-        .from("profiles")
-        .upsert(
-          { user_id: resolvedUserId, linkedin_token: accessToken, linkedin_connected: true },
-          { onConflict: "user_id" }
-        );
-      saveError = error;
-    } else {
-      // Last resort: update by email
-      const { error } = await supabase
-        .from("profiles")
-        .update({ linkedin_token: accessToken, linkedin_connected: true })
-        .eq("email", userEmail.trim());
-      saveError = error;
+    // If still no userId, look up from Supabase auth by email
+    if (!resolvedUserId && userEmail) {
+      const authLookup = await fetch(
+        `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(userEmail.trim())}`,
+        { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+      );
+      if (authLookup.ok) {
+        const authData = await authLookup.json().catch(() => ({}));
+        resolvedUserId = authData?.users?.[0]?.id ?? null;
+      }
     }
 
-    if (saveError) {
-      console.error("[LinkedIn callback] Supabase save error:", saveError);
-      redirect(res, 302, makeErrorUrl());
+    if (!resolvedUserId) {
+      console.error("[LinkedIn callback] Could not resolve user_id for", userEmail);
+      redirect(res, 302, makeErrorUrl("user_not_found", "Could not find your account. Please sign in again."));
       return;
     }
 
-    console.log("[LinkedIn callback] Saved token for:", userEmail, "userId:", resolvedUserId, "origin:", appOrigin);
+    const { error: saveError } = await supabase
+      .from("profiles")
+      .upsert(
+        { user_id: resolvedUserId, linkedin_token: accessToken, linkedin_connected: true },
+        { onConflict: "user_id" }
+      );
 
+    if (saveError) {
+      console.error("[LinkedIn callback] Supabase save error:", saveError);
+      redirect(res, 302, makeErrorUrl("db_error", saveError.message));
+      return;
+    }
+
+    console.log("[LinkedIn callback] Token saved. userId:", resolvedUserId, "origin:", appOrigin);
     redirect(res, 302, makeSuccessUrl());
   } catch (err) {
     console.error("[LinkedIn callback] Unhandled error:", err);
-    redirect(res, 302, makeErrorUrl());
+    redirect(res, 302, makeErrorUrl("server_error", err.message || "Unexpected error"));
   }
 }
 
