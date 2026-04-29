@@ -7,10 +7,8 @@ const UUID_RE =
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    // Support both direct user_id and nested payload.user_id (legacy shape)
-    const payload = body?.payload ?? body;
     const userId =
-      typeof payload?.user_id === 'string' ? payload.user_id.trim() : '';
+      typeof body.user_id === 'string' ? body.user_id.trim() : '';
 
     if (!userId || !UUID_RE.test(userId)) {
       return NextResponse.json(
@@ -20,11 +18,16 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await runAutomation(userId);
-    return NextResponse.json(result, { status: result.success ? 200 : 422 });
+
+    if (!result.success) {
+      return NextResponse.json(result, { status: 422 });
+    }
+
+    return NextResponse.json(result);
   } catch (error: any) {
-    console.error('[trigger-make] Error:', error);
+    console.error('[automate] Unexpected error:', error);
     return NextResponse.json(
-      { success: false, error: 'Automation failed' },
+      { success: false, error: error.message ?? 'Automation failed' },
       { status: 500 }
     );
   }
