@@ -147,9 +147,9 @@ try {
 // Production (Vercel) uses the serverless function at api/linkedin/callback.js.
 // This Express route is only for local dev when running: node server.js
 // Redirect URI for token exchange must match LinkedIn app config exactly.
-const PRODUCTION_APP_URL = 'https://linkedin-saas-three.vercel.app';
+const PRODUCTION_APP_URL = 'https://linkedin-theta-seven.vercel.app';
 const LINKEDIN_CALLBACK_PATH = '/api/linkedin/callback';
-const REDIRECT_URI_EXACT = 'https://linkedin-saas-three.vercel.app/api/linkedin/callback';
+const REDIRECT_URI_EXACT = 'https://linkedin-theta-seven.vercel.app/api/linkedin/callback';
 
 const LINKEDIN_REQUIRED_ENV = [
   'LINKEDIN_CLIENT_ID',

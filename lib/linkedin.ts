@@ -1,5 +1,5 @@
 // Stable production domain for Vercel. Never use preview URLs or window.location.origin for OAuth.
-const PRODUCTION_APP_URL = 'https://linkedin-saas-three.vercel.app';
+const PRODUCTION_APP_URL = 'https://linkedin-theta-seven.vercel.app';
 
 /**
  * API base for LinkedIn redirect_uri and token exchange.

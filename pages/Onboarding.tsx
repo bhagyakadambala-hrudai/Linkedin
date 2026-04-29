@@ -1047,7 +1047,7 @@ export const Onboarding: React.FC = () => {
       returnPath: "/app/profile-setup",
     }));
     const redirectUri = encodeURIComponent(
-      "https://linkedin-saas-three.vercel.app/api/linkedin/callback"
+      "https://linkedin-theta-seven.vercel.app/api/linkedin/callback"
     );
     const scope = encodeURIComponent("openid profile email w_member_social");
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodeURIComponent(state)}`;

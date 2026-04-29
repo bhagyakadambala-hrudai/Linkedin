@@ -1,11 +1,11 @@
 const { createClient } = require("@supabase/supabase-js");
 
-const REDIRECT_URI = "https://linkedin-saas-three.vercel.app/api/linkedin/callback";
-const FRONTEND_BASE = "https://linkedin-saas-three.vercel.app";
+const REDIRECT_URI = "https://linkedin-theta-seven.vercel.app/api/linkedin/callback";
+const FRONTEND_BASE = "https://linkedin-theta-seven.vercel.app";
 
 // Whitelist of allowed origins — prevents open redirect attacks
 const ALLOWED_ORIGINS = [
-  "https://linkedin-saas-three.vercel.app",
+  "https://linkedin-theta-seven.vercel.app",
   "https://linkedin-saas-git-dev-hrudai.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",

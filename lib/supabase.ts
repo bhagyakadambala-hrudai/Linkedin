@@ -37,7 +37,7 @@ export function getPasswordResetRedirectTo(): string {
 
 /** Production redirect for Supabase OAuth (e.g. LinkedIn via Supabase). HashRouter: include #/ path. */
 export const SUPABASE_OAUTH_REDIRECT_TO =
-  'https://linkedin-saas-three.vercel.app/#/app/dashboard';
+  'https://linkedin-theta-seven.vercel.app/#/app/dashboard';
 
 /**
  * Use when enabling LinkedIn (or other) OAuth through Supabase Auth.

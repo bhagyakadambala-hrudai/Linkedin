@@ -17,7 +17,7 @@ async function handler(req, res) {
     const tokenRedirectUri =
       (typeof redirect_uri === "string" && redirect_uri.trim()) ||
       process.env.LINKEDIN_REDIRECT_URI ||
-      "https://linkedin-saas-three.vercel.app/api/linkedin/callback";
+      "https://linkedin-theta-seven.vercel.app/api/linkedin/callback";
 
     const authHeader = req.headers.authorization;
     const accessToken = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
