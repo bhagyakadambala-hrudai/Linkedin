@@ -1036,13 +1036,15 @@ export const Onboarding: React.FC = () => {
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
     const email = user?.email;
-    if (!email) {
+    const userId = user?.id;
+    if (!email || !userId) {
       setError("Please sign in to connect LinkedIn.");
       return;
     }
 
     const state = btoa(JSON.stringify({
       email,
+      userId,
       appOrigin: window.location.origin,
       returnPath: "/app/profile-setup",
     }));

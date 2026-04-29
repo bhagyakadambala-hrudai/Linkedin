@@ -45,9 +45,11 @@ async function handler(req, res) {
     }
 
     let userEmail;
+    let userId;
     try {
       const decoded = JSON.parse(Buffer.from(state, "base64").toString("utf8"));
       userEmail = decoded && decoded.email;
+      userId = decoded && decoded.userId;
 
       // Resolve origin — validate against whitelist to prevent open redirect
       if (decoded.appOrigin && ALLOWED_ORIGINS.includes(decoded.appOrigin)) {
@@ -100,30 +102,53 @@ async function handler(req, res) {
       return;
     }
 
-    console.log("Saving token for:", userEmail);
+    console.log("Saving token for:", userEmail, "userId:", userId || "unknown");
     console.log("Token:", accessToken ? "[REDACTED]" : "missing");
 
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({
-        linkedin_token: accessToken,
-        linkedin_connected: true,
-      })
-      .eq("email", userEmail.trim())
-      .select();
+    // Resolve userId from state, or fall back to looking up by email in auth.users
+    let resolvedUserId = typeof userId === "string" && userId.trim() ? userId.trim() : null;
 
-    if (error) {
-      console.error("[LinkedIn callback] Supabase update error:", error);
+    if (!resolvedUserId) {
+      // Fallback: look up user_id from profiles table by email
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("email", userEmail.trim())
+        .maybeSingle();
+      resolvedUserId = profileRow?.user_id ?? null;
+    }
+
+    let saveError = null;
+
+    if (resolvedUserId) {
+      // Preferred path: upsert by user_id (guaranteed to work)
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(
+          { user_id: resolvedUserId, linkedin_token: accessToken, linkedin_connected: true },
+          { onConflict: "user_id" }
+        );
+      saveError = error;
+    } else {
+      // Last resort: update by email
+      const { error } = await supabase
+        .from("profiles")
+        .update({ linkedin_token: accessToken, linkedin_connected: true })
+        .eq("email", userEmail.trim());
+      saveError = error;
+    }
+
+    if (saveError) {
+      console.error("[LinkedIn callback] Supabase save error:", saveError);
       redirect(res, 302, makeErrorUrl());
       return;
     }
 
-    const rowCount = data && data.length ? data.length : 0;
-    console.log("[LinkedIn callback] Saved token for:", userEmail, "rows updated:", rowCount, "origin:", appOrigin);
+    console.log("[LinkedIn callback] Saved token for:", userEmail, "userId:", resolvedUserId, "origin:", appOrigin);
 
     redirect(res, 302, makeSuccessUrl());
   } catch (err) {
