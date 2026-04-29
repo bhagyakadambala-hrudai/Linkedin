@@ -133,10 +133,16 @@ export default async function handler(req: Request): Promise<Response> {
   );
   if (!updateRes.ok) return json({ error: 'Failed to update automation status.' }, 500);
 
-  // Ensure rotation row exists
+  // Reset rotation — start from step 1, post_type 1 (text) on fresh enable
+  await supabaseFetch(
+    `/rest/v1/automation_rotation?user_id=eq.${encodeURIComponent(userId)}`,
+    'DELETE',
+    SERVICE_ROLE_KEY
+  );
   await supabaseFetch('/rest/v1/automation_rotation', 'POST', SERVICE_ROLE_KEY, {
     user_id: userId,
     current_step: 1,
+    post_type: 1,
   });
 
   // Kick off first post immediately (non-blocking)

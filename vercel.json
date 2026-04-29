@@ -2,14 +2,23 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "functions": {
-    "api/parse-resume.js":        { "maxDuration": 60 },
-    "api/generate-profile.js":    { "maxDuration": 60 },
-    "api/analyze-resume.js":      { "maxDuration": 60 },
-    "api/admin/users.js":         { "maxDuration": 10 },
-    "api/admin/posts.js":         { "maxDuration": 10 },
-    "api/admin/stats.js":         { "maxDuration": 10 },
-    "api/trigger-webhook.ts":     { "maxDuration": 30 }
+    "api/parse-resume.js":          { "maxDuration": 60 },
+    "api/generate-profile.js":      { "maxDuration": 60 },
+    "api/analyze-resume.js":        { "maxDuration": 60 },
+    "api/admin/users.js":           { "maxDuration": 10 },
+    "api/admin/posts.js":           { "maxDuration": 10 },
+    "api/admin/stats.js":           { "maxDuration": 10 },
+    "api/trigger-webhook.ts":       { "maxDuration": 60 },
+    "api/publish.ts":               { "maxDuration": 60 },
+    "api/automation/toggle.ts":     { "maxDuration": 60 },
+    "api/cron/daily-posts.ts":      { "maxDuration": 300 }
   },
+  "crons": [
+    {
+      "path": "/api/cron/daily-posts",
+      "schedule": "0 8 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/app/profile-setup", "destination": "/index.html" },
     { "source": "/app/:path*",        "destination": "/index.html" }
