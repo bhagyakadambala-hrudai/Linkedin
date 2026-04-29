@@ -206,7 +206,7 @@ export const AgentStatusPage: React.FC = () => {
               <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-md">3</div>
               <div>
                 <h4 className="font-bold text-gray-900">Scheduled Delivery</h4>
-                <p className="text-gray-500 text-sm">Posts are automatically delivered to Make.com and published to LinkedIn at your preferred times.</p>
+                <p className="text-gray-500 text-sm">Posts are automatically generated with AI and published directly to LinkedIn at your preferred times.</p>
               </div>
             </div>
           </div>

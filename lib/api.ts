@@ -151,7 +151,7 @@ export async function assertSessionUserMatches(userId: string): Promise<boolean>
 }
 
 /**
- * MANUAL "PUBLISH NOW" — POSTs to /api/publish; backend triggers Make.com (no client webhook URL).
+ * MANUAL "PUBLISH NOW" — POSTs to /api/publish; backend generates and publishes the post directly to LinkedIn.
  */
 export const publishNow = async (): Promise<{ success: boolean; message: string }> => {
   try {
@@ -206,7 +206,7 @@ export const publishNow = async (): Promise<{ success: boolean; message: string 
  * TRIGGER WEBHOOK — Calls /api/trigger-webhook when automation is enabled and
  * the user clicks "Publish Now". The backend enriches the payload with the
  * user's name, email, linkedin_profile_url, and automation_status before
- * forwarding it to Make.com. The webhook URL never touches the client.
+ * generating and publishing the LinkedIn post server-side via Gemini AI.
  *
  * Returns { success, message } — the same shape as publishNow() so the
  * dashboard can handle both identically.
@@ -858,7 +858,7 @@ export const getSupabasePosts = async (userId: string) => {
  *   1. Validates the user's session
  *   2. Checks that role, skills, and topics are present on the profile
  *   3. Sets active = true in the DB
- *   4. Fires the Make.com webhook with the user's profile data
+ *   4. Generates a LinkedIn post with Gemini AI and publishes it directly
  */
 export const startAgent = async (_userData?: any): Promise<{ success: boolean }> => {
   const { data: { session } } = await supabase.auth.getSession();

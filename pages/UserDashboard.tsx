@@ -156,8 +156,7 @@ export const UserDashboard: React.FC = () => {
        * Always use triggerWebhook() — the secure, authenticated route that
        * fetches the full profile (role, skills, topics, linkedin_token,
        * linkedin_profile_id) from Supabase server-side and sends it all to
-       * Make.com so the scenario can generate and post without a separate
-       * Supabase lookup.
+       * the automation engine so it can generate and publish the post directly.
        */
       const result = await triggerWebhook();
 

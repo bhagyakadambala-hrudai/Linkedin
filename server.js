@@ -106,7 +106,6 @@ const UserSchema = new mongoose.Schema({
   topics: [String],
   schedule: { type: Array, default: [] },
   agentActive: { type: Boolean, default: false },
-  makeScenarioId: String,
   plan: { type: String, default: 'dev' }
 });
 const User = mongoose.model('User', UserSchema);
@@ -304,46 +303,6 @@ app.get('/api/linkedin/callback', async (req, res) => {
   }
 });
 
-// --- PROXY FOR MAKE.COM AUTOMATION ---
-// Prevents CORS issues by calling Make.com from server, not browser.
-// API keys & webhook URL stay server-side only.
-app.post('/api/trigger-make', async (req, res) => {
-  const { payload } = req.body;
-  const webhookUrl = process.env.MAKE_WEBHOOK_URL;
-
-  if (!webhookUrl) {
-    console.error('MAKE_WEBHOOK_URL is not set in environment variables');
-    return res.status(500).json({ success: false, error: 'Automation not configured. Contact support.' });
-  }
-
-  try {
-    console.log(`[Make.com] Triggering webhook for user: ${payload?.user_id || 'unknown'}`);
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const responseText = await response.text();
-    console.log(`[Make.com] Response: ${response.status} — ${responseText}`);
-
-    if (!response.ok) {
-      return res.status(502).json({
-        success: false,
-        error: `Make.com returned status ${response.status}. Please check your scenario is active.`,
-        details: responseText
-      });
-    }
-
-    // Make.com returns "Accepted" (plain text) on success
-    return res.json({ success: true, message: 'Post scheduled successfully' });
-  } catch (error) {
-    console.error('[Make.com] Proxy Error:', error.message);
-    return res.status(500).json({ success: false, error: 'Failed to reach Make.com. Check server connectivity.' });
-  }
-});
-
 
 /**
  * GET /api/posts/:userId
@@ -367,10 +326,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /**
  * POST /api/publish
- * Same flow as api/publish.ts (Vercel): load profile via service role, trigger Make.com — used when Vite proxies /api to this server.
+ * Validates the user profile then triggers the automation engine.
+ * In local dev this only validates; the full Gemini+LinkedIn flow runs on Vercel functions.
  */
 app.post('/api/publish', async (req, res) => {
-  const webhookUrl = 'https://hook.us2.make.com/wkbb1u2cki5tlcxtmgaxq9efu56vg3ql';
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const content =
@@ -416,27 +375,7 @@ app.post('/api/publish', async (req, res) => {
       }
     }
 
-    console.log('Sending to Make webhook');
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content,
-        user_id: userId,
-        timestamp: new Date().toISOString(),
-      }),
-    });
-
-    console.log('Webhook response status:', response.status);
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      console.error('Publish error: Make returned non-OK', response.status, detail);
-      return res.status(502).json({ success: false, error: 'Make webhook failed' });
-    }
-
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, message: 'Publish queued. Automation runs via Vercel functions in production.' });
   } catch (e) {
     console.error('Publish error:', e);
     return res.status(500).json({ success: false });
@@ -533,15 +472,6 @@ app.post('/api/automation/toggle', async (req, res) => {
       .from('automation_rotation')
       .upsert({ user_id: userId, current_step: 1 }, { onConflict: 'user_id', ignoreDuplicates: true });
 
-    const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL;
-    if (makeWebhookUrl) {
-      fetch(makeWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, role, skills, topics }),
-      }).catch(err => console.error('[automation/toggle] Make.com webhook error:', err));
-    }
-
     return res.status(200).json({ success: true, message: 'Automation enabled.' });
   } catch (error) {
     console.error('[automation/toggle] Unexpected error:', error);
@@ -582,7 +512,7 @@ app.get('/api/logs', async (req, res) => {
 
 /**
  * POST /api/posts
- * Save a published post to Supabase (call from automation/Make.com after publishing to LinkedIn).
+ * Save a published post to Supabase after the automation engine publishes to LinkedIn.
  * Body: { user_id (valid UUID), content, status?, posted_at?, linkedin_post_id? }
  */
 app.post('/api/posts', async (req, res) => {
