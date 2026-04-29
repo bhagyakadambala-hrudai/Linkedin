@@ -1140,6 +1140,7 @@ export const Onboarding: React.FC = () => {
                 status={uploadStatus}
                 statusText={uploadStatusText}
                 fileName={uploadedFileName}
+                fileUrl={formData.resumeUrl}
                 disabled={isProcessing}
               />
             </AccordionSection>
