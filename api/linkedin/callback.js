@@ -78,8 +78,13 @@ async function handler(req, res) {
 
     const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/$/, "");
     const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
-    const clientId = (process.env.LINKEDIN_CLIENT_ID || "").trim();
-    const clientSecret = (process.env.LINKEDIN_CLIENT_SECRET || "").trim();
+    // Strip accidental "KEY=value" format if user pasted the wrong thing in Vercel
+    const rawClientId = (process.env.LINKEDIN_CLIENT_ID || "").trim();
+    const clientId = rawClientId.includes("=") ? rawClientId.split("=").pop().trim() : rawClientId;
+    const rawSecret = (process.env.LINKEDIN_CLIENT_SECRET || "").trim();
+    const clientSecret = rawSecret.includes("LINKEDIN_CLIENT_SECRET=") ? rawSecret.replace("LINKEDIN_CLIENT_SECRET=", "").trim() : rawSecret;
+
+    console.log("[LinkedIn callback] clientId length:", clientId.length, "first4:", clientId.slice(0, 4));
 
     const missing = [];
     if (!supabaseUrl) missing.push("SUPABASE_URL");
