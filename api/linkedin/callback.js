@@ -76,15 +76,23 @@ async function handler(req, res) {
       return;
     }
 
-    const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/$/, "");
-    const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
-    // Strip accidental "KEY=value" format if user pasted the wrong thing in Vercel
-    const rawClientId = (process.env.LINKEDIN_CLIENT_ID || "").trim();
-    const clientId = rawClientId.includes("=") ? rawClientId.split("=").pop().trim() : rawClientId;
-    const rawSecret = (process.env.LINKEDIN_CLIENT_SECRET || "").trim();
-    const clientSecret = rawSecret.includes("LINKEDIN_CLIENT_SECRET=") ? rawSecret.replace("LINKEDIN_CLIENT_SECRET=", "").trim() : rawSecret;
+    // Strip accidental "KEY=value" format — Vercel value field should only contain the value
+    function stripKeyPrefix(raw) {
+      const s = (raw || "").trim();
+      const eq = s.indexOf("=");
+      // If the part before = looks like an env var name (UPPER_CASE), strip it
+      if (eq > 0 && /^[A-Z][A-Z0-9_]+$/.test(s.slice(0, eq))) {
+        return s.slice(eq + 1).trim();
+      }
+      return s;
+    }
 
-    console.log("[LinkedIn callback] clientId length:", clientId.length, "first4:", clientId.slice(0, 4));
+    const supabaseUrl = stripKeyPrefix(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+    const serviceKey = stripKeyPrefix(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const clientId = stripKeyPrefix(process.env.LINKEDIN_CLIENT_ID);
+    const clientSecret = stripKeyPrefix(process.env.LINKEDIN_CLIENT_SECRET);
+
+    console.log("[LinkedIn callback] clientId length:", clientId.length, "serviceKey starts:", serviceKey.slice(0, 6));
 
     const missing = [];
     if (!supabaseUrl) missing.push("SUPABASE_URL");
