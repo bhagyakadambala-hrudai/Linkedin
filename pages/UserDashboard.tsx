@@ -41,13 +41,13 @@ export const UserDashboard: React.FC = () => {
     setLoading(true);
     try {
       const data = await getPosts(authUserId);
-      
-      // Filter unique posted logs strictly using status and deduplicating by URL/Content
+
+      // Accept both 'published' (new automation) and 'posted' (legacy)
       const uniquePosted = data
-        .filter((post: any) => post.status === 'posted')
+        .filter((post: any) => post.status === 'published' || post.status === 'posted')
         .reduce((acc: any[], current: any) => {
-          const isDuplicate = acc.find(item => 
-            (item.post_url && item.post_url === current.post_url) || 
+          const isDuplicate = acc.find(item =>
+            (item.post_url && item.post_url === current.post_url) ||
             (item.content === current.content)
           );
           if (!isDuplicate) acc.push(current);
@@ -273,9 +273,11 @@ export const UserDashboard: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center mr-4">
               <FileText className="w-6 h-6 text-yellow-600" />
             </div>
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Latest Insight</p>
-              <p className="text-2xl font-bold text-gray-900">Analyzed</p>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Latest Topic</p>
+              <p className="text-lg font-bold text-gray-900 truncate max-w-[220px]" title={jobs[0]?.topic || 'No posts yet'}>
+                {jobs[0]?.topic || 'No posts yet'}
+              </p>
             </div>
           </Card>
         </div>
@@ -313,7 +315,7 @@ export const UserDashboard: React.FC = () => {
                         <p className="font-semibold text-gray-900 line-clamp-1 max-w-[350px]">{job.content}</p>
                       </td>
                       <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
-                        {new Date(job.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {new Date(job.posted_at || job.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
                       <td className="px-6 py-4 text-right">
                         {job.post_url ? (
