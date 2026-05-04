@@ -171,8 +171,9 @@ async function handler(req, res) {
       );
 
     if (saveError) {
-      console.error("[LinkedIn callback] Supabase save error:", saveError);
-      redirect(res, 302, makeErrorUrl("db_error", saveError.message));
+      const projectId = supabaseUrl.replace("https://", "").split(".")[0];
+      console.error("[LinkedIn callback] Supabase save error on project:", projectId, saveError);
+      redirect(res, 302, makeErrorUrl("db_error", `Project: ${projectId} — ${saveError.message}`));
       return;
     }
 
