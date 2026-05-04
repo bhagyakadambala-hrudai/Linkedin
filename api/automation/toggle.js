@@ -129,13 +129,10 @@ module.exports = async function handler(req, res) {
     });
 
     // Kick off first post (non-blocking, fire and forget)
+    const { runAutomation } = require('../../lib/automation.cjs');
     setImmediate(() => {
-      import('../../lib/automation.js').then(({ runAutomation }) => {
-        runAutomation(userId).catch((err) =>
-          console.error('[toggle] Initial post error:', err)
-        );
-      }).catch((err) =>
-        console.error('[toggle] Could not load automation module:', err)
+      runAutomation(userId).catch((err) =>
+        console.error('[toggle] Initial post error:', err)
       );
     });
 

@@ -31,7 +31,7 @@ module.exports = async function handler(req, res) {
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Run automation
-    const { runAutomation } = await import('../lib/automation.js');
+    const { runAutomation } = require('../lib/automation.cjs');
     const result = await runAutomation(userId);
 
     if (!result.success) {
