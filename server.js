@@ -16,7 +16,7 @@ const { analyzeResumeFromUrl } = require('./lib/analyzeResumeOpenAI.cjs');
 dotenv.config({ path: '.env.local' });
 
 // Initialize Supabase client with service role key (bypasses RLS)
-const supabaseUrl = process.env.SUPABASE_URL || 'https://fjghdbrqwbnzebeawvfg.supabase.co';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://bwgukehnimxshkonmztr.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 let supabaseAdmin = null;
 if (supabaseServiceKey) {
