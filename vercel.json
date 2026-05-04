@@ -8,7 +8,7 @@
     "api/admin/users.js":           { "maxDuration": 10 },
     "api/admin/posts.js":           { "maxDuration": 10 },
     "api/admin/stats.js":           { "maxDuration": 10 },
-    "api/trigger-webhook.ts":       { "maxDuration": 60 },
+    "api/trigger-webhook.js":       { "maxDuration": 60 },
     "api/publish.ts":               { "maxDuration": 60 },
     "api/automation/toggle.js":      { "maxDuration": 60 },
     "api/cron/daily-posts.ts":      { "maxDuration": 300 }
