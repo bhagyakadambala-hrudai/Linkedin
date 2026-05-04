@@ -1,4 +1,3 @@
-import { runAutomation } from '../../lib/automation';
 
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
@@ -157,9 +156,14 @@ export default async function handler(req: Request): Promise<Response> {
     post_type: 1,
   });
 
-  // Kick off first post immediately (non-blocking)
-  runAutomation(userId).catch((err) =>
-    console.error('[automation/toggle] Initial post error:', err)
+  // Kick off first post immediately (non-blocking) — dynamic import avoids
+  // module-load crash if Gemini/automation dependencies are missing
+  import('../../lib/automation').then(({ runAutomation }) => {
+    runAutomation(userId).catch((err: unknown) =>
+      console.error('[automation/toggle] Initial post error:', err)
+    );
+  }).catch((err: unknown) =>
+    console.error('[automation/toggle] Failed to import automation:', err)
   );
 
   return json(
