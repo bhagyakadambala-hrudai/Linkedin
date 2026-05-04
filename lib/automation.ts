@@ -174,7 +174,7 @@ async function generateContent(
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
 
   const ai = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   let prompt: string;
   if (postType === 1) prompt = buildTextPrompt(role, skills, topic);
