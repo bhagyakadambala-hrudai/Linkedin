@@ -56,6 +56,18 @@ async function supabaseFetch(
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !ANON_KEY) {
+    const missing = [
+      !SUPABASE_URL && 'SUPABASE_URL',
+      !SERVICE_ROLE_KEY && 'SUPABASE_SERVICE_ROLE_KEY',
+      !ANON_KEY && 'SUPABASE_ANON_KEY',
+    ].filter(Boolean).join(', ');
+    console.error('[toggle] Missing env vars:', missing);
+    return json({ error: `Server misconfigured. Missing: ${missing}` }, 500);
+  }
+
+  try {
+
   // 1. Validate Bearer token
   const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401);
@@ -154,4 +166,10 @@ export default async function handler(req: Request): Promise<Response> {
     { success: true, message: 'Automation enabled. Your first post is being generated and published.' },
     200
   );
+
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[toggle] Unhandled error:', msg);
+    return json({ error: `Server error: ${msg}` }, 500);
+  }
 }
