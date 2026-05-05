@@ -11,7 +11,7 @@
     "api/trigger-webhook.js":       { "maxDuration": 60 },
     "api/publish.js":               { "maxDuration": 60 },
     "api/automation/toggle.js":      { "maxDuration": 60 },
-    "api/cron/daily-posts.js":      { "maxDuration": 300 }
+    "api/cron/daily-posts.js":      { "maxDuration": 60 }
   },
   "crons": [
     {
