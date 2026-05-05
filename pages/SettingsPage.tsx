@@ -4,20 +4,22 @@ import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { 
-  User as UserIcon, 
-  Save, 
-  Loader2, 
-  Linkedin, 
-  ExternalLink, 
-  CheckCircle, 
-  Mail, 
+import {
+  User as UserIcon,
+  Save,
+  Loader2,
+  Linkedin,
+  ExternalLink,
+  CheckCircle,
+  Mail,
   AlertCircle,
   ShieldCheck,
   Link as LinkIcon,
-  Zap
+  Zap,
+  Clock,
+  Calendar
 } from 'lucide-react';
-import { getSupabaseSettings, requireSessionUserId, saveSettings } from '../lib/api';
+import { getSupabaseSettings, requireSessionUserId, saveSettings, saveSchedule } from '../lib/api';
 import { User } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -28,6 +30,10 @@ export const SettingsPage: React.FC = () => {
   const [connectingLinkedIn, setConnectingLinkedIn] = useState(false);
   const [disconnectingLinkedIn, setDisconnectingLinkedIn] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState(false);
+  const [postsPerDay, setPostsPerDay] = useState(1);
+  const [postTimes, setPostTimes] = useState<string[]>(['08']);
   const [linkedInSuccess, setLinkedInSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
@@ -89,6 +95,12 @@ export const SettingsPage: React.FC = () => {
         email: user.email ?? '',
         linkedInConnected: data.linkedInConnected || false
       }));
+      const ppd = Number(data.posts_per_day) || 1;
+      const pts = Array.isArray(data.post_times) && data.post_times.length > 0
+        ? data.post_times.map((t: any) => String(t).padStart(2, '0'))
+        : ['08'];
+      setPostsPerDay(ppd);
+      setPostTimes(pts.slice(0, ppd));
     } catch (e) {
       console.error("Failed to load settings");
     } finally {
@@ -304,6 +316,23 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleSaveSchedule = async () => {
+    setScheduleSaving(true);
+    try {
+      // Build times array matching postsPerDay slots
+      const times = Array.from({ length: postsPerDay }, (_, i) =>
+        (postTimes[i] || '08').padStart(2, '0')
+      );
+      await saveSchedule(postsPerDay, times);
+      setScheduleSuccess(true);
+      setTimeout(() => setScheduleSuccess(false), 3000);
+    } catch (e: any) {
+      setError('Failed to save schedule: ' + (e.message || 'Unknown error'));
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -451,6 +480,95 @@ export const SettingsPage: React.FC = () => {
                   value={formData.topics?.join(', ')}
                   onChange={(e) => setFormData({ ...formData, topics: e.target.value.split(',').map(s => s.trim()) })}
                 />
+              </div>
+            </div>
+          </Card>
+
+          {/* ── Post Schedule ───────────────────────────────────────── */}
+          <Card title="Post Schedule" description="Set how many posts per day and what time to publish (UTC 24h).">
+            <div className="space-y-5">
+              {/* Posts per day */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <Calendar className="inline w-4 h-4 mr-1 text-indigo-500" />
+                  Posts per day
+                </label>
+                <div className="flex gap-3">
+                  {[1, 2, 3].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => {
+                        setPostsPerDay(n);
+                        setPostTimes(prev => {
+                          const updated = [...prev];
+                          while (updated.length < n) updated.push(['08','14','20'][updated.length] || '08');
+                          return updated.slice(0, n);
+                        });
+                      }}
+                      className={`w-14 h-14 rounded-xl text-lg font-bold border-2 transition-all ${
+                        postsPerDay === n
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Time slots */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <Clock className="inline w-4 h-4 mr-1 text-indigo-500" />
+                  Post time{postsPerDay > 1 ? 's' : ''} (UTC)
+                </label>
+                <div className="flex flex-wrap gap-4">
+                  {Array.from({ length: postsPerDay }, (_, i) => (
+                    <div key={i} className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-400">Slot {i + 1}</span>
+                      <select
+                        value={postTimes[i] || '08'}
+                        onChange={e => {
+                          const updated = [...postTimes];
+                          updated[i] = e.target.value;
+                          setPostTimes(updated);
+                        }}
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      >
+                        {Array.from({ length: 24 }, (_, h) => {
+                          const val = String(h).padStart(2, '0');
+                          const label = `${val}:00 UTC`;
+                          return <option key={val} value={val}>{label}</option>;
+                        })}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-400">
+                  Posts will be published automatically at these UTC times every day when automation is active.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveSchedule}
+                  disabled={scheduleSaving}
+                  className="gap-2"
+                >
+                  {scheduleSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                    : scheduleSuccess
+                    ? <><CheckCircle className="w-4 h-4" /> Saved!</>
+                    : <><Clock className="w-4 h-4" /> Save Schedule</>}
+                </Button>
+                {scheduleSuccess && (
+                  <span className="text-sm text-green-600 font-medium">Schedule updated.</span>
+                )}
               </div>
             </div>
           </Card>

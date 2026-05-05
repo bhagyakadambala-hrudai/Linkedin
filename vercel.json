@@ -11,12 +11,12 @@
     "api/trigger-webhook.js":       { "maxDuration": 60 },
     "api/publish.ts":               { "maxDuration": 60 },
     "api/automation/toggle.js":      { "maxDuration": 60 },
-    "api/cron/daily-posts.ts":      { "maxDuration": 300 }
+    "api/cron/daily-posts.js":      { "maxDuration": 300 }
   },
   "crons": [
     {
       "path": "/api/cron/daily-posts",
-      "schedule": "0 8 * * *"
+      "schedule": "0 * * * *"
     }
   ],
   "rewrites": [

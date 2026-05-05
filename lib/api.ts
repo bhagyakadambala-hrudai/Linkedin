@@ -734,6 +734,8 @@ export const getSupabaseSettings = async (userId: string) => {
     selected_plan: (data as any).selected_plan || null,
     resume_data: (data as any).resume_data ?? null,
     resume_url: (data as any).resume_url ?? '',
+    posts_per_day: (data as any).posts_per_day ?? 1,
+    post_times: (data as any).post_times ?? ['08'],
   };
 };
 
@@ -1046,7 +1048,15 @@ export const saveSettings = async (settings: any) => {
 };
 export const getLogs = async () => [];
 export const getSchedule = async () => [];
-export const saveSchedule = async (s: any) => ({ success: true });
+export const saveSchedule = async (postsPerDay: number, postTimes: string[]) => {
+  const uid = await requireSessionUserId();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ posts_per_day: postsPerDay, post_times: postTimes })
+    .eq('user_id', uid);
+  if (error) throw new Error(error.message);
+  return { success: true };
+};
 export const saveTopics = async (t: any) => ({ success: true });
 export const saveProfile = async (r: any, s: any) => ({ success: true });
 export const connectLinkedIn = async () => ({ success: true });
