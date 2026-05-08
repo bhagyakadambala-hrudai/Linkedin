@@ -65,6 +65,7 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[trigger-webhook] Error:', msg);
-    return res.status(500).json({ success: false, error: friendlyError(msg) });
+    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('too many');
+    return res.status(isQuota ? 429 : 500).json({ success: false, error: friendlyError(msg) });
   }
 };
