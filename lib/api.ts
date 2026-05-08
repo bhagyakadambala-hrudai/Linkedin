@@ -735,7 +735,8 @@ export const getSupabaseSettings = async (userId: string) => {
     resume_data: (data as any).resume_data ?? null,
     resume_url: (data as any).resume_url ?? '',
     posts_per_day: (data as any).posts_per_day ?? 1,
-    post_times: (data as any).post_times ?? ['08'],
+    post_times: (data as any).post_times ?? ['09'],
+    timezone: (data as any).timezone ?? 'India',
   };
 };
 
@@ -1048,11 +1049,11 @@ export const saveSettings = async (settings: any) => {
 };
 export const getLogs = async () => [];
 export const getSchedule = async () => [];
-export const saveSchedule = async (postsPerDay: number, postTimes: string[]) => {
+export const saveSchedule = async (postsPerDay: number, postTimes: string[], timezone: string) => {
   const uid = await requireSessionUserId();
   const { error } = await supabase
     .from('profiles')
-    .update({ posts_per_day: postsPerDay, post_times: postTimes })
+    .update({ posts_per_day: postsPerDay, post_times: postTimes, timezone })
     .eq('user_id', uid);
   if (error) throw new Error(error.message);
   return { success: true };

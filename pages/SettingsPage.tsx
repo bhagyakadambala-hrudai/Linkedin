@@ -23,6 +23,31 @@ import { getSupabaseSettings, requireSessionUserId, saveSettings, saveSchedule }
 import { User } from '../types';
 import { supabase } from '../lib/supabase';
 
+type TZ = 'Canada' | 'India';
+const TZ_NAMES: Record<TZ, string> = { Canada: 'America/Toronto', India: 'Asia/Kolkata' };
+const TZ_LABELS: Record<TZ, string> = { Canada: '🇨🇦 Canada (ET)', India: '🇮🇳 India (IST)' };
+
+function getTZOffsetHours(tzName: string): number {
+  const now = new Date();
+  const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const local = new Date(now.toLocaleString('en-US', { timeZone: tzName }));
+  return (local.getTime() - utc.getTime()) / 3600000;
+}
+function localToUTCHour(localHour: number, tz: TZ): string {
+  const offset = getTZOffsetHours(TZ_NAMES[tz]);
+  return String(Math.round(((localHour - offset) % 24 + 24) % 24)).padStart(2, '0');
+}
+function utcToLocalHour(utcHour: number, tz: TZ): string {
+  const offset = getTZOffsetHours(TZ_NAMES[tz]);
+  return String(Math.round(((utcHour + offset) % 24 + 24) % 24)).padStart(2, '0');
+}
+function formatLocalHour(h: number, tz: TZ): string {
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  const label = tz === 'Canada' ? 'ET' : 'IST';
+  return `${h12}:00 ${period} ${label}`;
+}
+
 export const SettingsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -33,7 +58,8 @@ export const SettingsPage: React.FC = () => {
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
   const [postsPerDay, setPostsPerDay] = useState(1);
-  const [postTimes, setPostTimes] = useState<string[]>(['08']);
+  const [timezone, setTimezone] = useState<TZ>('India');
+  const [localPostTimes, setLocalPostTimes] = useState<string[]>(['09']);
   const [linkedInSuccess, setLinkedInSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
@@ -96,11 +122,14 @@ export const SettingsPage: React.FC = () => {
         linkedInConnected: data.linkedInConnected || false
       }));
       const ppd = Number(data.posts_per_day) || 1;
-      const pts = Array.isArray(data.post_times) && data.post_times.length > 0
+      const savedTZ: TZ = (data.timezone === 'Canada' || data.timezone === 'India') ? data.timezone : 'India';
+      const utcTimes = Array.isArray(data.post_times) && data.post_times.length > 0
         ? data.post_times.map((t: any) => String(t).padStart(2, '0'))
-        : ['08'];
+        : ['03'];
+      const localTimes = utcTimes.map((t: string) => utcToLocalHour(Number(t), savedTZ));
       setPostsPerDay(ppd);
-      setPostTimes(pts.slice(0, ppd));
+      setTimezone(savedTZ);
+      setLocalPostTimes(localTimes.slice(0, ppd));
     } catch (e) {
       console.error("Failed to load settings");
     } finally {
@@ -319,11 +348,10 @@ export const SettingsPage: React.FC = () => {
   const handleSaveSchedule = async () => {
     setScheduleSaving(true);
     try {
-      // Build times array matching postsPerDay slots
-      const times = Array.from({ length: postsPerDay }, (_, i) =>
-        (postTimes[i] || '08').padStart(2, '0')
+      const utcTimes = Array.from({ length: postsPerDay }, (_, i) =>
+        localToUTCHour(Number(localPostTimes[i] || '09'), timezone)
       );
-      await saveSchedule(postsPerDay, times);
+      await saveSchedule(postsPerDay, utcTimes, timezone);
       setScheduleSuccess(true);
       setTimeout(() => setScheduleSuccess(false), 3000);
     } catch (e: any) {
@@ -485,8 +513,35 @@ export const SettingsPage: React.FC = () => {
           </Card>
 
           {/* ── Post Schedule ───────────────────────────────────────── */}
-          <Card title="Post Schedule" description="Set how many posts per day and what time to publish (UTC 24h).">
+          <Card title="Post Schedule" description="Choose your timezone and set how many posts per day to publish automatically.">
             <div className="space-y-5">
+
+              {/* Timezone selector */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Your Timezone
+                </label>
+                <div className="flex gap-3">
+                  {(['Canada', 'India'] as TZ[]).map(tz => (
+                    <button
+                      key={tz}
+                      type="button"
+                      onClick={() => {
+                        setTimezone(tz);
+                        // keep same local hours, just relabel
+                      }}
+                      className={`px-5 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                        timezone === tz
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      {TZ_LABELS[tz]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Posts per day */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -500,9 +555,10 @@ export const SettingsPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setPostsPerDay(n);
-                        setPostTimes(prev => {
+                        setLocalPostTimes(prev => {
+                          const defaults = ['09', '14', '19'];
                           const updated = [...prev];
-                          while (updated.length < n) updated.push(['08','14','20'][updated.length] || '08');
+                          while (updated.length < n) updated.push(defaults[updated.length] || '09');
                           return updated.slice(0, n);
                         });
                       }}
@@ -522,32 +578,31 @@ export const SettingsPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <Clock className="inline w-4 h-4 mr-1 text-indigo-500" />
-                  Post time{postsPerDay > 1 ? 's' : ''} (UTC)
+                  Post time{postsPerDay > 1 ? 's' : ''}
                 </label>
                 <div className="flex flex-wrap gap-4">
                   {Array.from({ length: postsPerDay }, (_, i) => (
                     <div key={i} className="flex flex-col gap-1">
                       <span className="text-xs text-gray-400">Slot {i + 1}</span>
                       <select
-                        value={postTimes[i] || '08'}
+                        value={localPostTimes[i] || '09'}
                         onChange={e => {
-                          const updated = [...postTimes];
+                          const updated = [...localPostTimes];
                           updated[i] = e.target.value;
-                          setPostTimes(updated);
+                          setLocalPostTimes(updated);
                         }}
                         className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                       >
                         {Array.from({ length: 24 }, (_, h) => {
                           const val = String(h).padStart(2, '0');
-                          const label = `${val}:00 UTC`;
-                          return <option key={val} value={val}>{label}</option>;
+                          return <option key={val} value={val}>{formatLocalHour(h, timezone)}</option>;
                         })}
                       </select>
                     </div>
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-gray-400">
-                  Posts will be published automatically at these UTC times every day when automation is active.
+                  Posts publish automatically every day at these times when automation is active.
                 </p>
               </div>
 
