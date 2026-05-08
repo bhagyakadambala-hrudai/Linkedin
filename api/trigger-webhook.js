@@ -2,10 +2,22 @@ const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   ''
-).replace(/\/$/, '');
+).replace(/\/$/,'');
 
 const ANON_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
-const SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+function friendlyError(msg) {
+  if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many')) {
+    return 'AI quota exceeded. Please wait a minute before publishing again.';
+  }
+  if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key')) {
+    return 'AI API key is invalid or expired. Please contact support.';
+  }
+  if (msg.toLowerCase().includes('linkedin') || msg.includes('LinkedIn')) {
+    return 'LinkedIn publishing failed. Please check your LinkedIn connection in Settings.';
+  }
+  return 'Post generation failed. Please try again in a moment.';
+}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
@@ -35,7 +47,12 @@ module.exports = async function handler(req, res) {
     const result = await runAutomation(userId);
 
     if (!result.success) {
-      return res.status(422).json(result);
+      const msg = result.error || 'Automation failed';
+      const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('too many');
+      return res.status(isQuota ? 429 : 422).json({
+        success: false,
+        error: friendlyError(msg),
+      });
     }
 
     return res.status(200).json({
@@ -48,6 +65,6 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[trigger-webhook] Error:', msg);
-    return res.status(500).json({ error: `Server error: ${msg}` });
+    return res.status(500).json({ success: false, error: friendlyError(msg) });
   }
 };
