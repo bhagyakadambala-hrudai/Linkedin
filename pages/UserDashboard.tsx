@@ -31,8 +31,8 @@ export const UserDashboard: React.FC = () => {
   const lastPublishAt = React.useRef<number>(0);
   const publishInFlight = React.useRef<boolean>(false);
 
-  /** Minimum milliseconds between two publish triggers (10 seconds). */
-  const PUBLISH_DEBOUNCE_MS = 10_000;
+  /** Minimum milliseconds between two publish triggers (60 seconds). */
+  const PUBLISH_DEBOUNCE_MS = 60_000;
 
   const planInfo = PLANS.find(p => p.id === planId);
 
@@ -130,13 +130,13 @@ export const UserDashboard: React.FC = () => {
   };
 
   const handlePublish = async () => {
-    // ── Dedup guard: block concurrent clicks ──────────────────────────────────
+    // ── Dedup guard: block concurrent clicks ────────────────────────────────────
     if (publishInFlight.current) {
       console.warn('[handlePublish] Request already in-flight — ignoring duplicate click.');
       return;
     }
 
-    // ── Debounce guard: prevent rapid re-triggers (10 s window) ───────────────
+    // ── Debounce guard: prevent rapid re-triggers (60 s window) ─────────────────
     const now = Date.now();
     if (now - lastPublishAt.current < PUBLISH_DEBOUNCE_MS) {
       const secondsLeft = Math.ceil((PUBLISH_DEBOUNCE_MS - (now - lastPublishAt.current)) / 1000);
