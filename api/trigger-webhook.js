@@ -6,8 +6,14 @@ const SUPABASE_URL = (
 
 const ANON_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
 
+function isQuotaError(msg) {
+  const m = msg.toLowerCase();
+  return msg.includes('429') || m.includes('quota') || m.includes('rate') ||
+    m.includes('too many') || m.includes('exhausted') || m.includes('resource_exhausted');
+}
+
 function friendlyError(msg) {
-  if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many')) {
+  if (isQuotaError(msg)) {
     return 'AI quota exceeded. Please wait a minute before publishing again.';
   }
   if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key')) {
@@ -48,8 +54,7 @@ module.exports = async function handler(req, res) {
 
     if (!result.success) {
       const msg = result.error || 'Automation failed';
-      const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('too many');
-      return res.status(isQuota ? 429 : 422).json({
+      return res.status(isQuotaError(msg) ? 429 : 422).json({
         success: false,
         error: friendlyError(msg),
       });
@@ -65,7 +70,6 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[trigger-webhook] Error:', msg);
-    const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('too many');
-    return res.status(isQuota ? 429 : 500).json({ success: false, error: friendlyError(msg) });
+    return res.status(isQuotaError(msg) ? 429 : 500).json({ success: false, error: friendlyError(msg) });
   }
 };
