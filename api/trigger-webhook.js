@@ -15,7 +15,7 @@ function isQuotaError(msg) {
 
 function friendlyError(msg) {
   if (isQuotaError(msg)) {
-    return 'AI quota exceeded. Please wait a minute before publishing again.';
+    return 'Gemini free-tier quota exhausted. To fix: enable billing at console.cloud.google.com for your Gemini project, or create a new API key in a brand-new Google Cloud project and update GEMINI_API_KEY in Vercel.';
   }
   if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key')) {
     return 'AI API key is invalid or expired. Please contact support.';
