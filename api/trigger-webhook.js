@@ -1,4 +1,4 @@
-// v4 — OpenRouter, production-ready error handling
+// v5 — full error surfacing, timeout-safe, all failure modes covered
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -28,7 +28,8 @@ function isAuthError(msg) {
 }
 
 function friendlyError(msg) {
-  if (msg.toLowerCase().includes('not configured')) {
+  const m = msg.toLowerCase();
+  if (m.includes('not configured') || m.includes('openrouter_api_key')) {
     return 'OPENROUTER_API_KEY is not set. Add it in Vercel → Settings → Environment Variables, then redeploy.';
   }
   if (isLinkedInError(msg)) {
@@ -40,7 +41,8 @@ function friendlyError(msg) {
   if (isAuthError(msg)) {
     return 'OpenRouter API key is invalid or expired. Check OPENROUTER_API_KEY in Vercel → Settings → Environment Variables.';
   }
-  return 'Post generation failed. Please try again in a moment.';
+  // Surface the real underlying error instead of hiding it — helps diagnose unknown failures
+  return `Post generation failed: ${msg.slice(0, 150)}`;
 }
 
 module.exports = async function handler(req, res) {
@@ -71,7 +73,7 @@ module.exports = async function handler(req, res) {
     if (!result.success) {
       const msg = result.error || 'Automation failed';
       console.error('[trigger-webhook] runAutomation failed:', msg);
-      const status = isQuotaError(msg) ? 429 : isLinkedInError(msg) ? 422 : 500;
+      const status = isQuotaError(msg) ? 429 : isLinkedInError(msg) ? 422 : isAuthError(msg) ? 401 : 500;
       return res.status(status).json({ success: false, error: friendlyError(msg) });
     }
 
@@ -85,6 +87,7 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[trigger-webhook] Caught error:', msg);
+    if (err instanceof Error && err.stack) console.error('[trigger-webhook] Stack:', err.stack);
     const status = isLinkedInError(msg) ? 422 : isQuotaError(msg) ? 429 : isAuthError(msg) ? 401 : 500;
     return res.status(status).json({ success: false, error: friendlyError(msg) });
   }
