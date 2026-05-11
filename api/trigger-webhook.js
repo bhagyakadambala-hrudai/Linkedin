@@ -1,4 +1,4 @@
-// v3 — model fallback chain, LinkedIn/Gemini 429 correctly distinguished
+// v4 — OpenRouter, production-ready error handling
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -13,26 +13,32 @@ function isLinkedInError(msg) {
     m.includes('li:person') || m.includes('digitalmedia');
 }
 
-function isGeminiQuotaError(msg) {
+function isQuotaError(msg) {
   if (isLinkedInError(msg)) return false;
   const m = msg.toLowerCase();
-  return msg.includes('429') || m.includes('quota') || m.includes('rate') ||
-    m.includes('too many') || m.includes('exhausted') || m.includes('resource_exhausted');
+  return msg.includes('429') || m.includes('quota') || m.includes('rate limit') ||
+    m.includes('too many') || m.includes('exhausted');
+}
+
+function isAuthError(msg) {
+  return msg.includes('401') || msg.includes('403') || msg.includes('400') ||
+    msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('invalid') ||
+    msg.toLowerCase().includes('not configured') || msg.toLowerCase().includes('forbidden') ||
+    msg.toLowerCase().includes('no auth') || msg.toLowerCase().includes('api key');
 }
 
 function friendlyError(msg) {
   if (msg.toLowerCase().includes('not configured')) {
     return 'OPENROUTER_API_KEY is not set. Add it in Vercel → Settings → Environment Variables, then redeploy.';
   }
-  // LinkedIn check FIRST — LinkedIn also returns 429 for rate limits
   if (isLinkedInError(msg)) {
-    return 'LinkedIn publishing failed. Please check your LinkedIn connection in Settings.';
+    return 'LinkedIn publishing failed. Please reconnect your LinkedIn account in Settings.';
   }
-  if (isGeminiQuotaError(msg)) {
-    return 'AI quota exceeded. Please check your OPENROUTER_API_KEY in Vercel settings and try again.';
+  if (isQuotaError(msg)) {
+    return 'AI rate limit hit. Please wait a minute and try again.';
   }
-  if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('invalid')) {
-    return 'OpenRouter API key is invalid or expired. Check OPENROUTER_API_KEY in Vercel settings.';
+  if (isAuthError(msg)) {
+    return 'OpenRouter API key is invalid or expired. Check OPENROUTER_API_KEY in Vercel → Settings → Environment Variables.';
   }
   return 'Post generation failed. Please try again in a moment.';
 }
@@ -64,10 +70,9 @@ module.exports = async function handler(req, res) {
 
     if (!result.success) {
       const msg = result.error || 'Automation failed';
-      return res.status(isGeminiQuotaError(msg) ? 429 : 422).json({
-        success: false,
-        error: friendlyError(msg),
-      });
+      console.error('[trigger-webhook] runAutomation failed:', msg);
+      const status = isQuotaError(msg) ? 429 : isLinkedInError(msg) ? 422 : 500;
+      return res.status(status).json({ success: false, error: friendlyError(msg) });
     }
 
     return res.status(200).json({
@@ -79,8 +84,8 @@ module.exports = async function handler(req, res) {
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[trigger-webhook] Error:', msg);
-    const status = isLinkedInError(msg) ? 422 : isGeminiQuotaError(msg) ? 429 : 500;
+    console.error('[trigger-webhook] Caught error:', msg);
+    const status = isLinkedInError(msg) ? 422 : isQuotaError(msg) ? 429 : isAuthError(msg) ? 401 : 500;
     return res.status(status).json({ success: false, error: friendlyError(msg) });
   }
 };
