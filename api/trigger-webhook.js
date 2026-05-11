@@ -26,7 +26,7 @@ function friendlyError(msg) {
     return 'LinkedIn publishing failed. Please check your LinkedIn connection in Settings.';
   }
   if (isGeminiQuotaError(msg)) {
-    return 'AI quota exceeded. Your new Gemini API key may not be active yet — make sure GEMINI_API_KEY is updated in Vercel and redeploy. If the issue persists, enable billing on your Google Cloud project.';
+    return 'AI quota exceeded. Please check your OPENROUTER_API_KEY in Vercel settings and try again.';
   }
   if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key')) {
     return 'AI API key is invalid or expired. Please contact support.';
