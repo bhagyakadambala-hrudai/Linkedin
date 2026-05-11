@@ -28,11 +28,15 @@ export const UserDashboard: React.FC = () => {
    * - publishInFlight: true while a request is in-flight (blocks concurrent clicks)
    * These live in refs so they don't cause re-renders.
    */
-  const lastPublishAt = React.useRef<number>(0);
-  const publishInFlight = React.useRef<boolean>(false);
-
-  /** Minimum milliseconds between two publish triggers (60 seconds). */
   const PUBLISH_DEBOUNCE_MS = 60_000;
+  const LAST_PUBLISH_KEY = 'autolink_last_publish_at';
+
+  // Read from localStorage so the cooldown survives page refreshes
+  const lastPublishAt = React.useRef<number>(() => {
+    try { return parseInt(localStorage.getItem(LAST_PUBLISH_KEY) || '0', 10); }
+    catch { return 0; }
+  });
+  const publishInFlight = React.useRef<boolean>(false);
 
   const planInfo = PLANS.find(p => p.id === planId);
 
@@ -130,13 +134,13 @@ export const UserDashboard: React.FC = () => {
   };
 
   const handlePublish = async () => {
-    // ── Dedup guard: block concurrent clicks ────────────────────────────────────
+    // ── Dedup guard: block concurrent clicks ────────────────────────────────────────────
     if (publishInFlight.current) {
       console.warn('[handlePublish] Request already in-flight — ignoring duplicate click.');
       return;
     }
 
-    // ── Debounce guard: prevent rapid re-triggers (60 s window) ─────────────────
+    // ── Debounce guard: prevent rapid re-triggers (60 s window) ─────────────────────
     const now = Date.now();
     if (now - lastPublishAt.current < PUBLISH_DEBOUNCE_MS) {
       const secondsLeft = Math.ceil((PUBLISH_DEBOUNCE_MS - (now - lastPublishAt.current)) / 1000);
@@ -160,7 +164,8 @@ export const UserDashboard: React.FC = () => {
        */
       const result = await triggerWebhook();
 
-      lastPublishAt.current = Date.now(); // record timestamp on every attempt
+      lastPublishAt.current = Date.now();
+      try { localStorage.setItem(LAST_PUBLISH_KEY, String(lastPublishAt.current)); } catch {}
       setPublishState(result.success ? 'success' : 'error');
       setPublishMessage(result.message);
 
