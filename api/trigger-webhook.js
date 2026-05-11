@@ -1,3 +1,4 @@
+// v2 — model fallback chain, RESOURCE_EXHAUSTED detection
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
