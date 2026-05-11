@@ -21,6 +21,9 @@ function isGeminiQuotaError(msg) {
 }
 
 function friendlyError(msg) {
+  if (msg.toLowerCase().includes('not configured')) {
+    return 'OPENROUTER_API_KEY is not set. Add it in Vercel → Settings → Environment Variables, then redeploy.';
+  }
   // LinkedIn check FIRST — LinkedIn also returns 429 for rate limits
   if (isLinkedInError(msg)) {
     return 'LinkedIn publishing failed. Please check your LinkedIn connection in Settings.';
@@ -28,8 +31,8 @@ function friendlyError(msg) {
   if (isGeminiQuotaError(msg)) {
     return 'AI quota exceeded. Please check your OPENROUTER_API_KEY in Vercel settings and try again.';
   }
-  if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key')) {
-    return 'AI API key is invalid or expired. Please contact support.';
+  if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('invalid')) {
+    return 'OpenRouter API key is invalid or expired. Check OPENROUTER_API_KEY in Vercel settings.';
   }
   return 'Post generation failed. Please try again in a moment.';
 }
