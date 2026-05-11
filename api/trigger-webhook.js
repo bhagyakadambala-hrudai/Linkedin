@@ -1,4 +1,4 @@
-// v2 — model fallback chain, RESOURCE_EXHAUSTED detection
+// v3 — model fallback chain, LinkedIn/Gemini 429 correctly distinguished
 const SUPABASE_URL = (
   process.env.SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -7,21 +7,29 @@ const SUPABASE_URL = (
 
 const ANON_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
 
-function isQuotaError(msg) {
+function isLinkedInError(msg) {
+  const m = msg.toLowerCase();
+  return m.includes('linkedin') || m.includes('ugcposts') || m.includes('registerupload') ||
+    m.includes('li:person') || m.includes('digitalmedia');
+}
+
+function isGeminiQuotaError(msg) {
+  if (isLinkedInError(msg)) return false;
   const m = msg.toLowerCase();
   return msg.includes('429') || m.includes('quota') || m.includes('rate') ||
     m.includes('too many') || m.includes('exhausted') || m.includes('resource_exhausted');
 }
 
 function friendlyError(msg) {
-  if (isQuotaError(msg)) {
-    return 'Gemini free-tier quota exhausted. To fix: enable billing at console.cloud.google.com for your Gemini project, or create a new API key in a brand-new Google Cloud project and update GEMINI_API_KEY in Vercel.';
+  // LinkedIn check FIRST — LinkedIn also returns 429 for rate limits
+  if (isLinkedInError(msg)) {
+    return 'LinkedIn publishing failed. Please check your LinkedIn connection in Settings.';
+  }
+  if (isGeminiQuotaError(msg)) {
+    return 'AI quota exceeded. Your new Gemini API key may not be active yet — make sure GEMINI_API_KEY is updated in Vercel and redeploy. If the issue persists, enable billing on your Google Cloud project.';
   }
   if (msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('api key')) {
     return 'AI API key is invalid or expired. Please contact support.';
-  }
-  if (msg.toLowerCase().includes('linkedin') || msg.includes('LinkedIn')) {
-    return 'LinkedIn publishing failed. Please check your LinkedIn connection in Settings.';
   }
   return 'Post generation failed. Please try again in a moment.';
 }
@@ -40,7 +48,6 @@ module.exports = async function handler(req, res) {
     }
     const token = authHeader.slice(7).trim();
 
-    // Resolve user from token
     const authRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` },
     });
@@ -49,13 +56,12 @@ module.exports = async function handler(req, res) {
     const userId = authData?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Run automation
     const { runAutomation } = require('../lib/automation.cjs');
     const result = await runAutomation(userId);
 
     if (!result.success) {
       const msg = result.error || 'Automation failed';
-      return res.status(isQuotaError(msg) ? 429 : 422).json({
+      return res.status(isGeminiQuotaError(msg) ? 429 : 422).json({
         success: false,
         error: friendlyError(msg),
       });
@@ -71,6 +77,7 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[trigger-webhook] Error:', msg);
-    return res.status(isQuotaError(msg) ? 429 : 500).json({ success: false, error: friendlyError(msg) });
+    const status = isLinkedInError(msg) ? 422 : isGeminiQuotaError(msg) ? 429 : 500;
+    return res.status(status).json({ success: false, error: friendlyError(msg) });
   }
 };
