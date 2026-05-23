@@ -121,7 +121,7 @@ export const SettingsPage: React.FC = () => {
         email: user.email ?? '',
         linkedInConnected: data.linkedInConnected || false
       }));
-      const ppd = Number(data.posts_per_day) || 1;
+      const ppd = 1; // locked to 1 post per day
       const savedTZ: TZ = (data.timezone === 'Canada' || data.timezone === 'India') ? data.timezone : 'India';
       const utcTimes = Array.isArray(data.post_times) && data.post_times.length > 0
         ? data.post_times.map((t: any) => String(t).padStart(2, '0'))
