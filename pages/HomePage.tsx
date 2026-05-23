@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Bot,
   Sparkles,
@@ -13,42 +13,25 @@ import {
   Target,
   RefreshCw,
   LineChart,
-  Check,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
-import { getSupabaseSettings, saveSelectedPlan } from '../lib/api';
+import { getSupabaseSettings } from '../lib/api';
 import { isProfileComplete } from '../lib/profileCompletion';
-
-const DEMO_PLANS = [
-  { id: 'Starter', name: 'Starter (Demo)', price: 19, features: ['3 posts/week', 'Text only', 'Basic Analytics'] },
-  { id: 'Pro', name: 'Pro (Demo)', price: 39, features: ['5 posts/week', 'Text + Image', 'Engagement AI'], popular: true },
-  { id: 'Business', name: 'Business (Demo)', price: 79, features: ['Daily posts', 'All formats', 'Priority Support'] },
-];
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const syncAuthAndPlan = async () => {
+    const syncAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (cancelled) return;
-      setIsLoggedIn(!!user);
-      if (user?.id) {
-        const settings = await getSupabaseSettings(user.id);
-        const p = settings.selected_plan ? String(settings.selected_plan) : null;
-        if (!cancelled) setSelectedPlan(p);
-      } else if (!cancelled) {
-        setSelectedPlan(null);
-      }
+      if (!cancelled) setIsLoggedIn(!!user);
     };
-    syncAuthAndPlan();
+    syncAuth();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      syncAuthAndPlan();
+      syncAuth();
     });
     return () => {
       cancelled = true;
@@ -70,57 +53,18 @@ export const HomePage: React.FC = () => {
     }
   }, [navigate]);
 
-  useEffect(() => {
-    if ((location.state as { scrollToPricing?: boolean })?.scrollToPricing) {
-      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, location.pathname, navigate]);
-
-  const handleChoosePlan = async (plan: string) => {
+  const handleGetStarted = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.id) {
       navigate('/auth', { replace: true });
       return;
     }
-    try {
-      await saveSelectedPlan(user.id, plan, user.email ?? undefined);
-      setSelectedPlan(plan);
-      const settings = await getSupabaseSettings(user.id);
-      navigate(
-        isProfileComplete(settings) ? '/app/dashboard' : '/app/profile-setup',
-        { replace: true }
-      );
-    } catch (e) {
-      console.warn('Could not save plan to Supabase', e);
-    }
-  };
-
-  const handleGetStarted = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.id) {
-      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
     const settings = await getSupabaseSettings(user.id);
-    const plan = settings.selected_plan ? String(settings.selected_plan) : null;
-    const profileReady = isProfileComplete(settings);
-    if (!plan) {
-      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-    } else if (!profileReady) {
-      navigate('/app/profile-setup');
-    } else {
-      navigate('/app/dashboard');
-    }
-  };
-
-  const scrollToPricing = () => {
-    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+    navigate(isProfileComplete(settings) ? '/app/dashboard' : '/app/profile-setup', { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header - only Sign In and View Plans */}
       <header className="fixed w-full bg-white/80 backdrop-blur-md border-b border-gray-100 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -144,11 +88,7 @@ export const HomePage: React.FC = () => {
                 Sign In
               </Button>
             )}
-            {selectedPlan ? (
-              <Button onClick={handleGetStarted}>Get Started</Button>
-            ) : (
-              <Button onClick={scrollToPricing}>View Plans</Button>
-            )}
+            <Button onClick={handleGetStarted}>Get Started</Button>
           </div>
         </div>
       </header>
@@ -163,8 +103,8 @@ export const HomePage: React.FC = () => {
           Create, schedule, and publish LinkedIn posts automatically using AI.
         </p>
         <div className="flex justify-center">
-          <Button size="lg" onClick={scrollToPricing}>
-            View Plans
+          <Button size="lg" onClick={handleGetStarted}>
+            Get Started
           </Button>
         </div>
       </section>
@@ -327,53 +267,6 @@ export const HomePage: React.FC = () => {
                 Data-driven suggestions to improve engagement.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section - Demo plans only, no payment */}
-      <section id="pricing" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-center text-gray-600 mb-12 max-w-xl mx-auto">
-            Choose a plan to get started. Demo only — no payment required.
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {DEMO_PLANS.map((plan) => (
-              <div
-                key={plan.id}
-                className="bg-gray-50 rounded-2xl shadow-sm border border-gray-200 p-8 flex flex-col relative overflow-hidden"
-              >
-                {plan.popular && (
-                  <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                    MOST POPULAR
-                  </div>
-                )}
-                <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
-                <div className="mt-4 flex items-baseline">
-                  <span className="text-4xl font-extrabold text-gray-900">${plan.price}</span>
-                  <span className="ml-1 text-gray-500">/month</span>
-                </div>
-                <ul className="mt-8 space-y-4 flex-1">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start">
-                      <Check className="w-5 h-5 text-green-500 mr-2 shrink-0" />
-                      <span className="text-gray-600 text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  className="mt-8"
-                  variant={plan.popular ? 'primary' : 'outline'}
-                  fullWidth
-                  onClick={() => handleChoosePlan(plan.id)}
-                >
-                  Choose Plan
-                </Button>
-              </div>
-            ))}
           </div>
         </div>
       </section>
