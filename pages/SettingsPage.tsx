@@ -549,28 +549,13 @@ export const SettingsPage: React.FC = () => {
                   Posts per day
                 </label>
                 <div className="flex gap-3">
-                  {[1, 2, 3].map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => {
-                        setPostsPerDay(n);
-                        setLocalPostTimes(prev => {
-                          const defaults = ['09', '14', '19'];
-                          const updated = [...prev];
-                          while (updated.length < n) updated.push(defaults[updated.length] || '09');
-                          return updated.slice(0, n);
-                        });
-                      }}
-                      className={`w-14 h-14 rounded-xl text-lg font-bold border-2 transition-all ${
-                        postsPerDay === n
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    className="w-14 h-14 rounded-xl text-lg font-bold border-2 bg-indigo-600 text-white border-indigo-600"
+                    disabled
+                  >
+                    1
+                  </button>
                 </div>
               </div>
 
